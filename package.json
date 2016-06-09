@@ -1,5 +1,5 @@
 {
-  "name": "bitcoins2you",
+  "name": "bitcointoyou",
   "version": "0.1.0",
   "description": "NodeJS implementation of BTC2U API",
   "main": "index.js",
