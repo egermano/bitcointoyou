@@ -3,7 +3,16 @@ var https = require('https'),
     crypto = require('crypto-js'),
     _ = require('lodash');
 
-
+_.mixin({
+  // compact for objects
+  compactObject: function(to_clean) {
+    _.map(to_clean, function(value, key, to_clean) {
+      if (value === undefined)
+        delete to_clean[key];
+    });
+    return to_clean;
+  }
+});
 
 var BTC2U = function(key, secret) {
   this.key = key;
@@ -39,9 +48,10 @@ BTC2U.prototype._request = function(method, path, data, callback, args) {
   var req = https.request(options, function(res) {
     res.setEncoding('utf8');
     var buffer = '';
-    res.on('data', function(data) {
-      buffer += data;
+    res.on('data', function(temp) {
+      buffer += temp;
     });
+
     res.on('end', function() {
       if (res.statusCode !== 200) {
         return callback(new Error('BTC2U error ' + res.statusCode + ': ' + buffer));
@@ -49,7 +59,7 @@ BTC2U.prototype._request = function(method, path, data, callback, args) {
       try {
         var json = that._parseResponse(buffer);
       } catch (err) {
-        return callback(err);
+        return callback('Parse Error: ' + err);
       }
       callback(null, json);
     });
@@ -92,7 +102,7 @@ BTC2U.prototype._generateNonce = function() {
 }
 
 BTC2U.prototype._get = function(action, callback, args) {
-  args = _.compact(args);
+  args = _.compactObject(args);
   var path = '/api/' + action + (querystring.stringify(args) === '' ? '/' : '/?') + querystring.stringify(args);
   this._request('get', path, undefined, callback, args)
 }
@@ -103,7 +113,7 @@ BTC2U.prototype._post = function(action, callback, args) {
 
   var path = '/api/' + action + '/';
 
-  args = _.compact(args);
+  args = _.compactObject(args);
   var data = querystring.stringify(args);
 
   this._request('post', path, data, callback, args);
@@ -143,6 +153,14 @@ BTC2U.prototype.trades = function(options, callback) {
 
 BTC2U.prototype.balance = function(callback) {
   this._post('balance.aspx', callback, {});
+}
+
+BTC2U.prototype.orders = function(status, callback) {
+  this._post('getorders.aspx', callback, {'status': status});
+}
+
+BTC2U.prototype.order = function(id, callback) {
+  this._post('getordersid.aspx', callback, {'id': id});
 }
 
 module.exports = BTC2U;
