@@ -21,6 +21,7 @@
   "author": "Bruno Germano <bruno.germano@gmail.com>",
   "license": "MIT",
   "dependencies": {
+    "crypto-js": "^3.1.6",
     "https": "^1.0.0",
     "lodash": "^4.13.1",
     "querystring": "^0.2.0"

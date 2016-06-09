@@ -1,16 +1,18 @@
 var https = require('https'),
     querystring = require('querystring'),
+    crypto = require('crypto-js'),
     _ = require('lodash');
 
 
 
-var BTC2U = function(key, secret, client_id) {
+var BTC2U = function(key, secret) {
   this.key = key;
   this.secret = secret;
-  this.client_id = client_id;
 }
 
 BTC2U.prototype._request = function(method, path, data, callback, args) {
+
+  var that = this;
 
   var options = {
     host: 'www.bitcointoyou.com',
@@ -24,6 +26,14 @@ BTC2U.prototype._request = function(method, path, data, callback, args) {
   if(method === 'post') {
     options.headers['Content-Length'] = data.length;
     options.headers['content-type'] = 'application/x-www-form-urlencoded';
+
+    var nonce = this._generateNonce();
+    var message = nonce + this.key;
+    var signature = crypto.enc.Base64.stringify(crypto.HmacSHA256(message, this.secret)).toUpperCase();
+
+    options.headers['key'] = this.key;
+    options.headers['signature'] = signature;
+    options.headers['nonce'] = nonce;
   }
 
   var req = https.request(options, function(res) {
@@ -34,10 +44,10 @@ BTC2U.prototype._request = function(method, path, data, callback, args) {
     });
     res.on('end', function() {
       if (res.statusCode !== 200) {
-        return callback(new Error('Bitstamp error ' + res.statusCode + ': ' + buffer));
+        return callback(new Error('BTC2U error ' + res.statusCode + ': ' + buffer));
       }
       try {
-        var json = JSON.parse(buffer);
+        var json = that._parseResponse(buffer);
       } catch (err) {
         return callback(err);
       }
@@ -88,26 +98,27 @@ BTC2U.prototype._get = function(action, callback, args) {
 }
 
 BTC2U.prototype._post = function(action, callback, args) {
-  if(!this.key || !this.secret || !this.client_id)
-    return callback(new Error('Must provide key, secret and client ID to make this API request.'));
+  if(!this.key || !this.secret)
+    return callback(new Error('Must provide key and secret to make this API request.'));
 
   var path = '/api/' + action + '/';
 
-  var nonce = this._generateNonce();
-  var message = nonce + this.client_id + this.key;
-  var signer = crypto.createHmac('sha256', new Buffer(this.secret, 'utf8'));
-  var signature = signer.update(message).digest('hex').toUpperCase();
-
-  args = _.extend({
-    key: this.key,
-    signature: signature,
-    nonce: nonce
-  }, args);
-
-  args = _.compactObject(args);
+  args = _.compact(args);
   var data = querystring.stringify(args);
 
   this._request('post', path, data, callback, args);
+}
+
+BTC2U.prototype._parseResponse = function(buffer) {
+  var json = JSON.parse(buffer);
+
+  if (!(json.success*1)) {
+    throw new Error('BTC2U error - ' + json.error);
+
+    return false;
+  } else {
+    return json.oReturn;
+  }
 }
 
 // Public
@@ -126,6 +137,12 @@ BTC2U.prototype.trades = function(options, callback) {
     options = undefined;
   }
   this._get('trades.aspx', callback, options);
+}
+
+// Private
+
+BTC2U.prototype.balance = function(callback) {
+  this._post('balance.aspx', callback, {});
 }
 
 module.exports = BTC2U;
